@@ -1,0 +1,937 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <title>Geotab VK Manager | Telefónica Tech</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <style>
+        .json-editor { font-family: monospace; background: #1e1e1e; color: #d4d4d4; resize: vertical; }
+        .resizable-table th { position: relative; }
+        .resizable-table th .resizer {
+            position: absolute; right: 0; top: 0; width: 5px; height: 100%;
+            cursor: col-resize; background: transparent;
+        }
+        .resizable-table th .resizer:hover { background: #cbd5e1; }
+        .resizable-table td, .resizable-table th { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+        .key-item { max-width: 100%; overflow: hidden; text-overflow: ellipsis; }
+        .spinner { display: inline-block; width: 16px; height: 16px; border: 2px solid #fff; border-top-color: transparent; border-radius: 50%; animation: spin 0.8s linear infinite; }
+        @keyframes spin { to { transform: rotate(360deg); } }
+        .key-expiring { background: #fef3c7 !important; border: 1px solid #f59e0b; }
+        .key-expired { background: #fee2e2 !important; border: 1px solid #ef4444; }
+        .key-ok { background: #d1fae5 !important; border: 1px solid #10b981; }
+        .loading-overlay { position: fixed; inset: 0; background: rgba(0,0,0,0.3); display: flex; align-items: center; justify-content: center; z-index: 100; }
+        .loading-box { background: white; padding: 24px 32px; border-radius: 12px; display: flex; flex-direction: column; align-items: center; gap: 12px; font-weight: 600; min-width: 300px; }
+        .loading-box .spinner { border-color: #00a9e0; border-top-color: transparent; width: 24px; height: 24px; }
+        .loading-box .progress-bar { width: 100%; height: 8px; background: #e2e8f0; border-radius: 4px; overflow: hidden; }
+        .loading-box .progress-fill { height: 100%; background: #00a9e0; transition: width 0.3s ease; }
+        .loading-box .progress-text { font-size: 12px; color: #64748b; }
+        .faulty-device { background: #fef2f2 !important; border-left: 4px solid #ef4444 !important; }
+        .faulty-badge { background: #ef4444; color: white; font-size: 9px; padding: 2px 6px; border-radius: 4px; }
+    </style>
+</head>
+<body class="bg-slate-50 p-6 font-sans">
+    <div class="max-w-7xl mx-auto">
+        <div id="status-bar" class="fixed top-4 right-4 z-50 space-y-2"></div>
+
+        <div class="flex justify-between items-center mb-8 bg-white p-4 rounded-xl shadow-sm border border-slate-200">
+            <div class="flex items-center gap-6">
+                <img src="https://info.telefonicatech.com/hs-fs/hubfs/telefonica-tech-logo-positive.png?width=200" class="h-10">
+                <div class="h-8 w-px bg-slate-300"></div>
+                <h1 class="text-xl font-bold text-slate-800">Geotab Keyless Manager</h1>
+            </div>
+            <div class="flex items-center gap-3">
+                <div id="auth-indicator" class="text-xs font-bold px-4 py-1.5 rounded-full bg-red-100 text-red-600 border border-red-200">No Active Session</div>
+                <button id="btn-logout" onclick="logout()" class="hidden text-xs font-bold px-4 py-1.5 rounded-full bg-slate-100 text-slate-600 border border-slate-200 hover:bg-slate-200 transition">Cerrar Sesión</button>
+            </div>
+        </div>
+
+        <div class="grid grid-cols-12 gap-6">
+            <div class="col-span-4 space-y-6">
+                <div class="bg-white p-5 rounded-lg shadow-sm border border-slate-200">
+                    <h2 class="font-bold mb-4 text-slate-700">1. Authorization</h2>
+                    <input id="db" type="text" placeholder="Database" onchange="loadVehicles()" class="w-full border mb-2 p-2 rounded text-sm outline-none focus:ring-2 focus:ring-blue-500">
+                    <input id="user" type="email" placeholder="Email" class="w-full border mb-2 p-2 rounded text-sm outline-none">
+                    <input id="pass" type="password" placeholder="Password" class="w-full border mb-4 p-2 rounded text-sm outline-none">
+                    <button onclick="authenticate()" class="w-full bg-[#00a9e0] hover:bg-[#007fb0] text-white py-2.5 rounded font-bold transition">Connect & Save</button>
+                </div>
+
+                <div class="bg-white p-5 rounded-lg shadow-sm border border-slate-200">
+                    <div class="flex justify-between items-center mb-4">
+                        <h2 class="font-bold text-slate-700">2. Plantillas de Llaves</h2>
+                        <button onclick="openTemplateModal()" class="text-xs bg-slate-100 hover:bg-slate-200 px-2 py-1 rounded font-medium">+ Nueva</button>
+                    </div>
+                    <select id="template-select" onchange="loadTemplate(this.value)" class="w-full border p-2 rounded text-sm mb-2 outline-none focus:ring-2 focus:ring-blue-500">
+                        <option value="">-- Seleccionar Plantilla --</option>
+                    </select>
+                    <div id="template-info" class="text-xs text-slate-500 hidden p-2 bg-slate-50 rounded">
+                        <div class="flex justify-between items-center">
+                            <div>
+                                <span class="font-medium">Version:</span> <span id="tpl-version"></span>
+                                <span class="mx-2">|</span>
+                                <span class="font-medium">Tags:</span> <span id="tpl-tags"></span>
+                            </div>
+                            <div class="flex gap-2">
+                                <button onclick="editTemplate()" class="text-blue-600 hover:underline">Editar</button>
+                                <button onclick="viewTemplateHistory()" class="text-slate-500 hover:underline">Historial</button>
+                                <button onclick="archiveTemplate()" class="text-red-500 hover:underline">Archivar</button>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+
+                <div class="bg-white p-5 rounded-lg shadow-sm border border-slate-200">
+                    <h2 class="font-bold mb-4 text-slate-700">3. Definicion Llave Virtual</h2>
+                    <div class="mb-4 p-3 bg-slate-50 rounded-lg border border-slate-200">
+                        <div class="flex justify-between items-center mb-2">
+                            <label class="text-sm font-medium text-slate-600">Duración de la llave</label>
+                            <span id="duration-value" class="text-sm font-bold text-[#00a9e0]">12 meses</span>
+                        </div>
+                        <input type="range" id="duration-slider" min="1" max="60" value="12"
+                               class="w-full h-2 bg-slate-200 rounded-lg appearance-none cursor-pointer accent-[#00a9e0]"
+                               oninput="updateDuration(this.value)">
+                        <div class="flex justify-between text-[10px] text-slate-400 mt-1">
+                            <span>1 mes</span>
+                            <span>60 meses</span>
+                        </div>
+                    </div>
+                    <textarea id="vk-body" class="json-editor w-full h-72 p-3 rounded text-xs"></textarea>
+                </div>
+            </div>
+
+            <div class="col-span-8 space-y-4">
+                <div class="bg-white p-4 rounded-lg shadow-sm border border-slate-200 flex justify-between items-center gap-4">
+                    <div class="flex gap-2">
+                        <button id="btn-deploy" onclick="bulkAction('create')" class="bg-green-600 text-white px-4 py-2 rounded text-sm font-bold hover:bg-green-700 flex items-center gap-2">Deploy Selected</button>
+                        <button id="btn-sync" onclick="syncAll()" class="bg-blue-500 text-white px-4 py-2 rounded text-sm font-bold hover:bg-blue-600 flex items-center gap-2">Sync All</button>
+                        <button id="btn-delete" onclick="deleteKeysBulk()" class="bg-red-600 text-white px-4 py-2 rounded text-sm font-bold hover:bg-red-700 flex items-center gap-2">Delete Keys</button>
+                    </div>
+                    <div class="flex gap-2 items-center">
+                        <button onclick="deleteDevicesBulk()" class="bg-orange-500 text-white px-3 py-2 rounded text-sm font-bold hover:bg-orange-600">Delete Devices</button>
+                        <button onclick="exportCSV()" class="text-slate-600 bg-white border px-3 py-2 rounded text-sm hover:bg-slate-50">Export CSV</button>
+                        <div class="relative group">
+                            <button onclick="document.getElementById('csvFile').click()" class="text-slate-600 bg-white border px-3 py-2 rounded text-sm hover:bg-slate-50">Import CSV</button>
+                            <div class="absolute bottom-full right-0 mb-2 hidden group-hover:block w-72 p-3 bg-slate-800 text-white text-xs rounded-lg shadow-lg z-50">
+                                <div class="font-bold mb-2">Formato CSV:</div>
+                                <code class="block bg-slate-900 p-2 rounded text-[10px] mb-2">Serial,Descripción[,Database]</code>
+                                <div class="text-slate-300 text-[10px]">
+                                    <div>• <b>Serial</b>: Número de serie GO9</div>
+                                    <div>• <b>Descripción</b>: Nombre del vehículo</div>
+                                    <div>• <b>Database</b>: (opcional) Si no se indica, usa la DB actual</div>
+                                </div>
+                                <div class="absolute bottom-0 right-4 translate-y-1/2 rotate-45 w-2 h-2 bg-slate-800"></div>
+                            </div>
+                        </div>
+                        <input type="file" id="csvFile" class="hidden" onchange="uploadCSV()">
+                    </div>
+                </div>
+
+                <div class="bg-white p-3 rounded-lg shadow-sm border border-slate-200 flex gap-4 items-center">
+                    <input id="search-box" type="text" placeholder="🔍 Buscar por serial, descripción o user reference..." oninput="filterVehicles()" class="border p-2 rounded text-sm flex-1 outline-none focus:ring-2 focus:ring-blue-500">
+                    <div class="flex items-center gap-2">
+                        <label class="text-xs text-slate-500">User Reference:</label>
+                        <input id="custom-user-ref" type="text" placeholder="Master Key" value="Master Key" class="border p-2 rounded text-sm w-32 outline-none" oninput="updateVkBody()">
+                    </div>
+                </div>
+
+                <div class="bg-slate-200 p-4 rounded-lg flex gap-2 items-center">
+                    <input id="v-serial" type="text" placeholder="GO9 Serial" class="border p-2 rounded text-sm flex-1">
+                    <input id="v-desc" type="text" placeholder="Description" class="border p-2 rounded text-sm flex-1">
+                    <button onclick="addVehicle()" class="bg-white px-6 py-2 rounded text-sm border font-bold hover:bg-gray-50 transition">Add Device</button>
+                </div>
+
+                <div class="bg-white rounded-lg shadow-sm border border-slate-200 overflow-hidden min-h-[300px]">
+                    <table class="w-full text-left border-collapse resizable-table" id="vehicle-list-table">
+                        <thead class="bg-slate-100 text-slate-600 text-[10px] uppercase font-bold tracking-wider">
+                            <tr>
+                                <th class="p-4" style="width:40px"><input type="checkbox" onclick="toggleAll(this)"></th>
+                                <th class="p-4" style="width:140px">GO9 Serial<div class="resizer"></div></th>
+                                <th class="p-4" style="width:180px">Description<div class="resizer"></div></th>
+                                <th class="p-4" style="width:320px">Keys<div class="resizer"></div></th>
+                                <th class="p-4 text-right" style="width:80px">Action</th>
+                            </tr>
+                        </thead>
+                        <tbody id="vehicle-table" class="divide-y divide-slate-100 text-sm"></tbody>
+                    </table>
+                </div>
+
+                <div class="relative">
+                    <div class="absolute top-2 right-2 z-10 flex gap-1">
+                        <button onclick="resetLogs()" class="text-[9px] bg-red-700 text-red-100 px-2 py-1 rounded hover:bg-red-600">Reset Log</button>
+                        <button onclick="exportLogs()" class="text-[9px] bg-slate-700 text-slate-300 px-2 py-1 rounded hover:bg-slate-600">Exportar Log</button>
+                    </div>
+                    <div class="bg-slate-900 text-emerald-400 p-4 rounded-lg font-mono text-[10px] h-32 overflow-y-auto" id="log-content"></div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Template Modal -->
+    <div id="template-modal" class="fixed inset-0 bg-black/50 hidden z-50 flex items-center justify-center">
+        <div class="bg-white rounded-lg shadow-xl w-[500px] max-h-[90vh] overflow-y-auto">
+            <div class="p-4 border-b flex justify-between items-center">
+                <h3 id="modal-title" class="font-bold text-lg">Nueva Plantilla</h3>
+                <button onclick="closeTemplateModal()" class="text-slate-400 hover:text-slate-600 text-2xl">&times;</button>
+            </div>
+            <div class="p-4 space-y-4">
+                <div>
+                    <label class="block text-sm font-medium mb-1">Nombre</label>
+                    <input id="tpl-name" type="text" placeholder="ej: Conductor Habitual" class="w-full border p-2 rounded text-sm outline-none focus:ring-2 focus:ring-blue-500">
+                </div>
+                <div>
+                    <label class="block text-sm font-medium mb-1">User Reference</label>
+                    <input id="tpl-user-ref" type="text" placeholder="ej: Master Key" class="w-full border p-2 rounded text-sm outline-none focus:ring-2 focus:ring-blue-500">
+                </div>
+                <div>
+                    <label class="block text-sm font-medium mb-1">Tags NFC (separados por coma)</label>
+                    <input id="tpl-nfc-tags" type="text" placeholder="7CF22JDPA1, 7CF22JCTA1" class="w-full border p-2 rounded text-sm outline-none focus:ring-2 focus:ring-blue-500">
+                </div>
+                <div>
+                    <label class="block text-sm font-medium mb-1">Duración por defecto (meses)</label>
+                    <input id="tpl-duration" type="number" value="12" min="1" max="60" class="w-full border p-2 rounded text-sm outline-none focus:ring-2 focus:ring-blue-500">
+                </div>
+                <div>
+                    <label class="block text-sm font-medium mb-1">Configuración JSON (permissions, privileges, etc.)</label>
+                    <textarea id="tpl-config" class="json-editor w-full h-40 p-3 rounded text-xs"></textarea>
+                </div>
+            </div>
+            <div class="p-4 border-t flex justify-end gap-2">
+                <button onclick="closeTemplateModal()" class="px-4 py-2 border rounded hover:bg-slate-50">Cancelar</button>
+                <button onclick="saveTemplate()" class="px-4 py-2 bg-[#00a9e0] text-white rounded hover:bg-[#007fb0] font-bold">Guardar</button>
+            </div>
+        </div>
+    </div>
+
+    <!-- History Modal -->
+    <div id="history-modal" class="fixed inset-0 bg-black/50 hidden z-50 flex items-center justify-center">
+        <div class="bg-white rounded-lg shadow-xl w-[400px] max-h-[80vh] overflow-y-auto">
+            <div class="p-4 border-b flex justify-between items-center">
+                <h3 class="font-bold text-lg">Historial de Versiones</h3>
+                <button onclick="closeHistoryModal()" class="text-slate-400 hover:text-slate-600 text-2xl">&times;</button>
+            </div>
+            <div id="history-content" class="p-4 space-y-2"></div>
+        </div>
+    </div>
+
+    <script>
+        function notify(msg, type='info') {
+            const bar = document.getElementById('status-bar');
+            const div = document.createElement('div');
+            div.className = `${type==='error'?'bg-red-500':'bg-blue-600'} text-white px-6 py-3 rounded shadow-lg text-sm font-bold`;
+            div.innerText = msg;
+            bar.appendChild(div);
+            setTimeout(() => div.remove(), 4000);
+        }
+
+        async function authenticate() {
+            const db = document.getElementById('db').value;
+            const user = document.getElementById('user').value;
+            const pass = document.getElementById('pass').value;
+            if(!db || !user || !pass) return notify("Faltan datos", "error");
+            document.cookie = `user_email=${user}; path=/`;
+            const res = await fetch('/auth', {
+                method: 'POST', headers: {'Content-Type': 'application/json'},
+                body: JSON.stringify({database: db, server: "my.geotab.com", username: user, password: pass})
+            });
+            if(res.ok) {
+                sessionActive = true;
+                startSessionTimer();
+                document.getElementById('auth-indicator').innerText = "Session Active (" + db + ")";
+                document.getElementById('auth-indicator').className = "text-xs font-bold px-4 py-1.5 rounded-full bg-emerald-100 text-emerald-600 border border-emerald-200";
+                document.getElementById('btn-logout').classList.remove('hidden');
+                await fetch('/settings', {method:'POST', headers:{'Content-Type':'application/json'}, body:JSON.stringify({database:db, username:user})});
+                showLoading("Cargando dispositivos y plantillas...");
+                await loadVehicles();
+                await loadTemplates();
+                hideLoading();
+                const deviceCount = document.querySelectorAll('.v-checkbox').length;
+                if(deviceCount > 0 && confirm(`¿Sincronizar los ${deviceCount} dispositivos con el servidor?`)) {
+                    await syncAllDevices();
+                }
+            } else {
+                const err = await res.json();
+                notify(err.error || "Error de Auth", "error");
+            }
+        }
+
+        let allVehicles = [];
+
+        async function loadVehicles() {
+            const tenant = document.getElementById('db').value;
+            if(!tenant) return;
+            const res = await fetch(`/vehicles?tenant=${tenant}`);
+            allVehicles = await res.json();
+            renderVehicles(allVehicles);
+            const lRes = await fetch('/logs');
+            const lData = await lRes.json();
+            document.getElementById('log-content').innerText = lData.map(l => `[${l.at}] ${l.action} - ${l.serial}`).join('\n');
+        }
+
+        function filterVehicles() {
+            const search = document.getElementById('search-box').value.toLowerCase();
+            const filtered = allVehicles.filter(v => {
+                const matchSerial = v.serial.toLowerCase().includes(search);
+                const matchDesc = v.desc.toLowerCase().includes(search);
+                const matchUserRef = v.keys.some(k => (k.ref || '').toLowerCase().includes(search));
+                return matchSerial || matchDesc || matchUserRef;
+            });
+            renderVehicles(filtered);
+        }
+
+        function getKeyStatus(expires) {
+            if (!expires) return { class: '', label: '' };
+            const now = Date.now();
+            const daysLeft = Math.floor((expires - now) / (1000 * 60 * 60 * 24));
+            if (daysLeft < 0) return { class: 'key-expired', label: '⚠️ Expirada' };
+            if (daysLeft <= 30) return { class: 'key-expiring', label: `⏰ ${daysLeft}d` };
+            return { class: 'key-ok', label: formatDate(expires) };
+        }
+
+        function formatDate(ts) {
+            if (!ts) return 'N/A';
+            return new Date(ts).toLocaleDateString('es-ES', { day: '2-digit', month: 'short', year: '2-digit' });
+        }
+
+        function renderVehicles(vehicles) {
+            document.getElementById('vehicle-table').innerHTML = vehicles.map(v => `
+                <tr class="hover:bg-slate-50 vehicle-row ${v.faulty ? 'faulty-device' : ''}" data-serial="${v.serial}" data-desc="${v.desc}">
+                    <td class="p-4"><input type="checkbox" class="v-checkbox" data-serial="${v.serial}"></td>
+                    <td class="p-4 font-mono font-bold">
+                        ${v.serial}
+                        ${v.faulty ? '<span class="faulty-badge ml-1">ERROR</span>' : ''}
+                    </td>
+                    <td class="p-4">${v.desc}</td>
+                    <td class="p-4">
+                        <div class="flex items-center gap-2 mb-1">
+                            <span class="bg-slate-200 text-slate-700 text-[9px] font-bold px-2 py-0.5 rounded-full">${v.keys.length} key${v.keys.length !== 1 ? 's' : ''}</span>
+                        </div>
+                        <div class="space-y-1">${v.keys.map(k => {
+                            const status = getKeyStatus(k.expires);
+                            return `<div class="flex justify-between p-1 rounded text-[9px] key-item ${status.class}" title="${k.ref || 'No ref'} | ${k.id} | Expira: ${formatDate(k.expires)}">
+                                <span class="truncate">${k.ref || 'No ref'} | ${k.id.slice(0,8)}...</span>
+                                <span class="flex items-center gap-1">
+                                    <span class="text-[8px]">${status.label}</span>
+                                    <button onclick="deleteKey('${v.serial}', '${k.id}')" class="text-red-500 ml-1 flex-shrink-0">Del</button>
+                                </span>
+                            </div>`;
+                        }).join('')}</div>
+                    </td>
+                    <td class="p-4 text-right space-x-2">
+                        <button onclick="syncKey('${v.serial}')" class="text-blue-600 text-xs">Sync</button>
+                        <button onclick="removeLocal('${v.serial}')" class="text-red-300">×</button>
+                    </td>
+                </tr>`).join('');
+        }
+
+        async function addVehicle() {
+            const db = document.getElementById('db').value;
+            const serial = document.getElementById('v-serial').value;
+            const desc = document.getElementById('v-desc').value;
+            if(!db || !serial) return notify("Falta DB o Serial", "error");
+            await fetch(`/vehicles?tenant=${db}`, {
+                method: 'POST', headers: {'Content-Type':'application/json'},
+                body: JSON.stringify({serial, desc})
+            });
+            loadVehicles();
+        }
+
+        async function uploadCSV() {
+            const db = document.getElementById('db').value;
+            const formData = new FormData();
+            formData.append('file', document.getElementById('csvFile').files[0]);
+            const res = await fetch(`/import-csv?tenant=${db}`, { method: 'POST', body: formData });
+            if(!res.ok) return notify("Error: Inicie sesión o verifique DB", "error");
+            loadVehicles();
+        }
+
+        async function syncKey(s) {
+            if(!sessionActive) return notify("Inicie sesión primero", "error");
+            await fetch(`/sync-key/${s}`);
+            loadVehicles();
+        }
+        async function syncAll() {
+            if(!sessionActive) return notify("Inicie sesión primero", "error");
+            const list = Array.from(document.querySelectorAll('.v-checkbox'));
+            if(list.length === 0) return notify("No hay dispositivos para sincronizar", "error");
+            const total = list.length;
+            showLoading(`Sincronizando dispositivos...`, true);
+            try {
+                for(let i = 0; i < list.length; i++) {
+                    const cb = list[i];
+                    updateProgress(i + 1, total, `Sincronizando ${cb.dataset.serial}...`);
+                    await fetch(`/sync-key/${cb.dataset.serial}`);
+                }
+                hideLoading();
+                notify("Sincronización completada");
+            } catch (e) {
+                hideLoading();
+                notify(`Error de sincronización: ${e.message}`, "error");
+            }
+            loadVehicles();
+        }
+
+        async function deleteKey(s, id) {
+            if(!sessionActive) return notify("Inicie sesión primero", "error");
+            if(confirm("¿Borrar llave?")) {
+                await fetch(`/delete-key/${s}/${id}`, {method:'DELETE'});
+                loadVehicles();
+            }
+        }
+        async function removeLocal(s) { if(confirm("¿Quitar de la lista?")) { await fetch(`/vehicles/${s}`, {method:'DELETE'}); loadVehicles(); } }
+        function toggleAll(src) { document.querySelectorAll('.v-checkbox').forEach(c => c.checked = src.checked); }
+
+        let sessionActive = false;
+        let sessionTimer = null;
+        const SESSION_TIMEOUT = 55 * 60 * 1000; // 55 minutes warning
+
+        function showLoading(msg, showProgress = false) {
+            const overlay = document.createElement('div');
+            overlay.id = 'loading-overlay';
+            overlay.className = 'loading-overlay';
+            overlay.innerHTML = `<div class="loading-box">
+                <div class="flex items-center gap-3">
+                    <div class="spinner"></div>
+                    <span id="loading-msg">${msg}</span>
+                </div>
+                ${showProgress ? `
+                    <div class="progress-bar"><div class="progress-fill" id="progress-fill" style="width: 0%"></div></div>
+                    <div class="progress-text" id="progress-text">0 / 0</div>
+                ` : ''}
+            </div>`;
+            document.body.appendChild(overlay);
+        }
+
+        function updateProgress(current, total, msg = null) {
+            const fill = document.getElementById('progress-fill');
+            const text = document.getElementById('progress-text');
+            const msgEl = document.getElementById('loading-msg');
+            if (fill) fill.style.width = `${(current / total) * 100}%`;
+            if (text) text.innerText = `${current} / ${total}`;
+            if (msg && msgEl) msgEl.innerText = msg;
+        }
+
+        function hideLoading() {
+            const overlay = document.getElementById('loading-overlay');
+            if (overlay) overlay.remove();
+        }
+
+        function startSessionTimer() {
+            if (sessionTimer) clearTimeout(sessionTimer);
+            sessionTimer = setTimeout(() => {
+                notify("⚠️ Sesión a punto de expirar. Reconecte pronto.", "error");
+            }, SESSION_TIMEOUT);
+        }
+
+        function exportCSV() {
+            if(!sessionActive) return notify("Inicie sesión primero", "error");
+            window.location.href = '/export-csv';
+        }
+
+        function exportLogs() {
+            window.location.href = '/export-logs';
+        }
+
+        async function resetLogs() {
+            if (!confirm("¿Eliminar todo el historial de logs?\n\nEsta acción no se puede deshacer.")) return;
+            try {
+                const res = await fetch('/logs', { method: 'DELETE' });
+                if (res.ok) {
+                    notify("Logs eliminados");
+                    loadVehicles(); // Refresh to show empty log
+                } else {
+                    notify("Error al eliminar logs", "error");
+                }
+            } catch (e) {
+                notify("Error de red", "error");
+            }
+        }
+
+        async function logout() {
+            if(!confirm("¿Cerrar sesión actual?")) return;
+            try {
+                await fetch('/logout', { method: 'POST' });
+                sessionActive = false;
+                if (sessionTimer) clearTimeout(sessionTimer);
+                document.getElementById('auth-indicator').innerText = "No Active Session";
+                document.getElementById('auth-indicator').className = "text-xs font-bold px-4 py-1.5 rounded-full bg-red-100 text-red-600 border border-red-200";
+                document.getElementById('btn-logout').classList.add('hidden');
+                document.getElementById('db').value = '';
+                document.getElementById('pass').value = '';
+                allVehicles = [];
+                renderVehicles([]);
+                // Clear template state
+                currentTemplates = [];
+                document.getElementById('template-select').innerHTML = '<option value="">-- Seleccionar Plantilla --</option>';
+                document.getElementById('template-info').classList.add('hidden');
+                window.currentTemplateId = null;
+                window.currentTemplateName = null;
+                window.currentTemplateVersion = null;
+                window.currentTemplateConfig = null;
+                window.currentTemplateNfcTags = ["7CF22JDPA1", "7CF22JCTA1"];
+                updateVkBody();
+                notify("Sesión cerrada. Puede conectar a otra base de datos.");
+            } catch (e) {
+                notify("Error al cerrar sesión", "error");
+            }
+        }
+
+        async function deleteKeysBulk() {
+            if(!sessionActive) return notify("Inicie sesión primero", "error");
+            const selected = Array.from(document.querySelectorAll('.v-checkbox:checked'));
+            if(selected.length === 0) return notify("Seleccione al menos un dispositivo", "error");
+            const serials = selected.map(el => el.dataset.serial);
+            if(!confirm(`¿Eliminar TODAS las llaves de ${serials.length} dispositivo(s)?\n\n${serials.join('\n')}`)) return;
+
+            showLoading(`Eliminando llaves...`, true);
+            const total = serials.length;
+            let totalDeleted = 0, errors = [];
+
+            for (let i = 0; i < serials.length; i++) {
+                const serial = serials[i];
+                updateProgress(i + 1, total, `Eliminando llaves de ${serial}...`);
+                try {
+                    const res = await fetch(`/delete-all-keys/${serial}`, { method: 'DELETE' });
+                    const data = await res.json();
+                    if (res.ok) {
+                        totalDeleted += data.deleted || 0;
+                        if (data.errors?.length > 0) errors.push(...data.errors);
+                    } else {
+                        errors.push({ serial, error: data.error || 'Error' });
+                    }
+                } catch (e) {
+                    errors.push({ serial, error: e.message });
+                }
+            }
+
+            // Sync to confirm changes
+            updateProgress(total, total, `Sincronizando para confirmar...`);
+            for (const serial of serials) {
+                await fetch(`/sync-key/${serial}`);
+            }
+
+            hideLoading();
+            if (errors.length > 0) {
+                notify(`Eliminadas ${totalDeleted} llaves. Errores: ${errors.length}`, "info");
+                console.error("Delete errors:", errors);
+            } else {
+                notify(`Eliminadas ${totalDeleted} llaves de ${total} dispositivos`);
+            }
+            loadVehicles();
+        }
+
+        async function syncAllDevices() {
+            const checkboxes = document.querySelectorAll('.v-checkbox');
+            if(checkboxes.length === 0) return;
+            const total = checkboxes.length;
+            showLoading(`Sincronizando dispositivos...`, true);
+            let i = 0;
+            for(const cb of checkboxes) {
+                i++;
+                updateProgress(i, total, `Sincronizando ${cb.dataset.serial}...`);
+                await fetch(`/sync-key/${cb.dataset.serial}`);
+            }
+            hideLoading();
+            loadVehicles();
+            notify("Sincronización completada");
+        }
+
+        async function deleteDevicesBulk() {
+            if(!sessionActive) return notify("Inicie sesión primero", "error");
+            const selected = Array.from(document.querySelectorAll('.v-checkbox:checked'));
+            if(selected.length === 0) return notify("Seleccione al menos un dispositivo", "error");
+            const serials = selected.map(el => el.dataset.serial);
+            if(!confirm(`¿Eliminar ${serials.length} dispositivo(s) de la lista local?\n\nEsto NO elimina las llaves del servidor.\n\n${serials.join('\n')}`)) return;
+
+            showLoading(`Eliminando dispositivos...`, true);
+            const total = serials.length;
+            updateProgress(1, total, `Eliminando ${total} dispositivos...`);
+
+            try {
+                const res = await fetch('/vehicles-bulk', {
+                    method: 'DELETE',
+                    headers: {'Content-Type':'application/json'},
+                    body: JSON.stringify({serials})
+                });
+                const data = await res.json();
+                hideLoading();
+                if(res.ok) {
+                    notify(`Eliminados ${data.count} dispositivos de la lista`);
+                } else {
+                    notify(data.error || "Error al eliminar dispositivos", "error");
+                }
+            } catch (e) {
+                hideLoading();
+                notify(`Error de red: ${e.message}`, "error");
+            }
+            loadVehicles();
+        }
+
+        async function bulkAction(type) {
+            if(!sessionActive) return notify("Inicie sesión primero", "error");
+            const selected = Array.from(document.querySelectorAll('.v-checkbox:checked'));
+            if(selected.length === 0) return notify("Seleccione al menos un dispositivo", "error");
+
+            const serials = selected.map(el => el.dataset.serial);
+            const userRef = document.getElementById('custom-user-ref').value || 'Master Key';
+            const months = document.getElementById('duration-slider').value;
+
+            // Check for devices that already have 4 keys (max limit)
+            const MAX_KEYS = 4;
+            const devicesAtLimit = [];
+            for (const serial of serials) {
+                const vehicle = allVehicles.find(v => v.serial === serial);
+                if (vehicle && vehicle.keys.length >= MAX_KEYS) {
+                    devicesAtLimit.push(`${serial} (${vehicle.keys.length} llaves)`);
+                }
+            }
+
+            if (devicesAtLimit.length > 0) {
+                notify(`Error: Los siguientes dispositivos ya tienen ${MAX_KEYS} llaves (máximo permitido):\n\n${devicesAtLimit.join('\n')}\n\nElimine llaves existentes antes de crear nuevas.`, "error");
+                alert(`⚠️ LÍMITE DE LLAVES ALCANZADO\n\nLos siguientes dispositivos ya tienen ${MAX_KEYS} llaves virtuales (máximo permitido):\n\n${devicesAtLimit.join('\n')}\n\nDebe eliminar llaves existentes antes de poder crear nuevas.`);
+                return;
+            }
+
+            if(!confirm(`¿Desplegar llaves en ${serials.length} dispositivo(s)?\n\nUser Reference: ${userRef}\nDuración: ${months} meses\n\nDispositivos:\n${serials.join('\n')}`)) return;
+
+            showLoading(`Desplegando llaves...`, true);
+            let success = 0, errors = [];
+            const total = selected.length;
+
+            for (let i = 0; i < selected.length; i++) {
+                const el = selected[i];
+                updateProgress(i + 1, total, `Desplegando en ${el.dataset.serial}...`);
+                try {
+                    const body = JSON.parse(document.getElementById('vk-body').value);
+                    // Add template info for logging
+                    const payload = {
+                        ...body,
+                        serialNumber: el.dataset.serial,
+                        _template_id: window.currentTemplateId,
+                        _template_name: window.currentTemplateName,
+                        _template_version: window.currentTemplateVersion
+                    };
+                    const res = await fetch('/create-key', {
+                        method: 'POST', headers: {'Content-Type':'application/json'},
+                        body: JSON.stringify(payload)
+                    });
+                    if (res.ok) success++;
+                    else {
+                        const err = await res.json();
+                        errors.push(`${el.dataset.serial}: ${err.error || 'Error'}`);
+                    }
+                } catch (e) {
+                    errors.push(`${el.dataset.serial}: ${e.message}`);
+                }
+            }
+
+            // Sync to confirm changes
+            updateProgress(total, total, `Sincronizando para confirmar...`);
+            for (const el of selected) {
+                await fetch(`/sync-key/${el.dataset.serial}`);
+            }
+
+            hideLoading();
+            if (errors.length > 0) {
+                notify(`Desplegadas ${success}/${total}. Errores: ${errors.length}`, errors.length === total ? "error" : "info");
+                console.error("Deploy errors:", errors);
+            } else {
+                notify(`Llaves desplegadas en ${success} dispositivo(s)`);
+            }
+            loadVehicles();
+        }
+
+        window.onload = async () => {
+            const settings = await (await fetch('/settings')).json();
+            if(settings.database) {
+                document.getElementById('db').value = settings.database;
+                loadVehicles();
+                loadTemplates();
+            }
+            if(settings.username) document.getElementById('user').value = settings.username;
+            initResizableColumns();
+            updateVkBody();
+        };
+
+        function updateDuration(months, skipVkBodyUpdate = false) {
+            document.getElementById('duration-value').innerText = months + (months === '1' ? ' mes' : ' meses');
+            if (!skipVkBodyUpdate) {
+                updateVkBody();
+            }
+        }
+
+        // Store current template config for use in updateVkBody
+        window.currentTemplateConfig = null;
+        window.currentTemplateNfcTags = ["7CF22JDPA1", "7CF22JCTA1"]; // Default tags
+
+        function updateVkBody() {
+            const months = parseInt(document.getElementById('duration-slider').value);
+            const userRef = document.getElementById('custom-user-ref')?.value || 'Master Key';
+            const now = new Date();
+            const end = new Date();
+            end.setMonth(end.getMonth() + months);
+
+            // Use template config if available, otherwise defaults
+            const baseConfig = window.currentTemplateConfig || {
+                permissions: ["Lock", "Unlock", "IgnitionInhibit", "IgnitionEnable"],
+                privileges: ["CheckinOverride"],
+                endBookConditions: ["IgnitionOff"]
+            };
+
+            const vkConfig = {
+                isStoredVirtualKey: true,
+                tapCardSerialNumbers: window.currentTemplateNfcTags,
+                userReference: userRef,
+                beginningTimestamp: now.getTime(),
+                endingTimestamp: end.getTime(),
+                ...baseConfig
+            };
+
+            document.getElementById('vk-body').value = JSON.stringify(vkConfig, null, 2);
+        }
+
+        function initResizableColumns() {
+            const table = document.getElementById('vehicle-list-table');
+            const resizers = table.querySelectorAll('.resizer');
+            resizers.forEach(resizer => {
+                let startX, startWidth, th;
+                resizer.addEventListener('mousedown', (e) => {
+                    th = resizer.parentElement;
+                    startX = e.pageX;
+                    startWidth = th.offsetWidth;
+                    document.addEventListener('mousemove', onMouseMove);
+                    document.addEventListener('mouseup', onMouseUp);
+                    e.preventDefault();
+                });
+                function onMouseMove(e) {
+                    const newWidth = startWidth + (e.pageX - startX);
+                    if (newWidth > 50) th.style.width = newWidth + 'px';
+                }
+                function onMouseUp() {
+                    document.removeEventListener('mousemove', onMouseMove);
+                    document.removeEventListener('mouseup', onMouseUp);
+                }
+            });
+        }
+
+        // ==================== TEMPLATE MANAGEMENT ====================
+        let currentTemplates = [];
+        let editingTemplateId = null;
+        window.currentTemplateId = null;
+        window.currentTemplateName = null;
+        window.currentTemplateVersion = null;
+
+        async function loadTemplates() {
+            const tenant = document.getElementById('db').value;
+            if (!tenant) return;
+            try {
+                const res = await fetch(`/templates?tenant=${tenant}`);
+                currentTemplates = await res.json();
+                const select = document.getElementById('template-select');
+                select.innerHTML = '<option value="">-- Seleccionar Plantilla --</option>' +
+                    currentTemplates.map(t => `<option value="${t.id}">${t.name} (v${t.version})</option>`).join('');
+            } catch (e) {
+                console.error("Error loading templates:", e);
+            }
+        }
+
+        async function loadTemplate(templateId) {
+            if (!templateId) {
+                document.getElementById('template-info').classList.add('hidden');
+                window.currentTemplateId = null;
+                window.currentTemplateName = null;
+                window.currentTemplateVersion = null;
+                window.currentTemplateConfig = null;
+                window.currentTemplateNfcTags = ["7CF22JDPA1", "7CF22JCTA1"]; // Reset to defaults
+                updateVkBody(); // Reset to default
+                return;
+            }
+
+            try {
+                const res = await fetch(`/templates/${templateId}`);
+                const tpl = await res.json();
+
+                // Store template config for use in updateVkBody
+                window.currentTemplateConfig = tpl.vk_config;
+                window.currentTemplateNfcTags = tpl.nfc_tags || ["7CF22JDPA1", "7CF22JCTA1"];
+
+                // Use template's user_ref or fall back to current value
+                const userRef = tpl.user_ref || document.getElementById('custom-user-ref').value || 'Master Key';
+                document.getElementById('custom-user-ref').value = userRef;
+
+                // Populate the vk-body editor with template config
+                const now = new Date();
+                const end = new Date();
+                end.setMonth(end.getMonth() + tpl.duration_months);
+
+                const vkConfig = {
+                    isStoredVirtualKey: true,
+                    tapCardSerialNumbers: tpl.nfc_tags,
+                    userReference: userRef,
+                    beginningTimestamp: now.getTime(),
+                    endingTimestamp: end.getTime(),
+                    ...tpl.vk_config
+                };
+
+                document.getElementById('vk-body').value = JSON.stringify(vkConfig, null, 2);
+                document.getElementById('duration-slider').value = tpl.duration_months;
+                updateDuration(tpl.duration_months.toString(), true); // Skip updateVkBody since we just set it
+
+                // Show template info
+                document.getElementById('template-info').classList.remove('hidden');
+                document.getElementById('tpl-version').textContent = tpl.version;
+                document.getElementById('tpl-tags').textContent = tpl.nfc_tags.join(', ');
+
+                // Store for use in key creation logging
+                window.currentTemplateId = tpl.id;
+                window.currentTemplateName = tpl.name;
+                window.currentTemplateVersion = tpl.version;
+
+                notify(`Plantilla "${tpl.name}" cargada`);
+            } catch (e) {
+                notify("Error cargando plantilla", "error");
+            }
+        }
+
+        function openTemplateModal(templateId = null) {
+            editingTemplateId = templateId;
+            document.getElementById('modal-title').textContent = templateId ? 'Editar Plantilla (crea nueva versión)' : 'Nueva Plantilla';
+
+            if (templateId) {
+                fetch(`/templates/${templateId}`).then(r => r.json()).then(full => {
+                    document.getElementById('tpl-name').value = full.name;
+                    document.getElementById('tpl-user-ref').value = full.user_ref || '';
+                    document.getElementById('tpl-nfc-tags').value = full.nfc_tags.join(', ');
+                    document.getElementById('tpl-duration').value = full.duration_months;
+                    document.getElementById('tpl-config').value = JSON.stringify(full.vk_config, null, 2);
+                });
+            } else {
+                document.getElementById('tpl-name').value = '';
+                document.getElementById('tpl-user-ref').value = '';
+                document.getElementById('tpl-nfc-tags').value = '';
+                document.getElementById('tpl-duration').value = 12;
+                document.getElementById('tpl-config').value = JSON.stringify({
+                    permissions: ["Lock", "Unlock", "IgnitionInhibit", "IgnitionEnable"],
+                    privileges: ["CheckinOverride"],
+                    endBookConditions: ["IgnitionOff"]
+                }, null, 2);
+            }
+
+            document.getElementById('template-modal').classList.remove('hidden');
+        }
+
+        function closeTemplateModal() {
+            document.getElementById('template-modal').classList.add('hidden');
+            editingTemplateId = null;
+        }
+
+        async function saveTemplate() {
+            const name = document.getElementById('tpl-name').value.trim();
+            const userRef = document.getElementById('tpl-user-ref').value.trim();
+            const nfcTagsRaw = document.getElementById('tpl-nfc-tags').value;
+            const nfcTags = nfcTagsRaw.split(',').map(s => s.trim()).filter(s => s);
+            const duration = parseInt(document.getElementById('tpl-duration').value);
+
+            let vkConfig;
+            try {
+                vkConfig = JSON.parse(document.getElementById('tpl-config').value);
+            } catch (e) {
+                notify("JSON inválido en configuración", "error");
+                return;
+            }
+
+            if (!name) {
+                notify("Nombre requerido", "error");
+                return;
+            }
+
+            const payload = { name, user_ref: userRef, nfc_tags: nfcTags, duration_months: duration, vk_config: vkConfig };
+            const method = editingTemplateId ? 'PUT' : 'POST';
+            const url = editingTemplateId ? `/templates/${editingTemplateId}` : '/templates';
+
+            try {
+                const res = await fetch(url, {
+                    method,
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify(payload)
+                });
+
+                if (res.ok) {
+                    const data = await res.json();
+                    notify(`Plantilla ${editingTemplateId ? 'actualizada' : 'creada'} (v${data.version})`);
+                    closeTemplateModal();
+                    await loadTemplates();
+                    // Select the new template
+                    document.getElementById('template-select').value = data.id;
+                    loadTemplate(data.id);
+                } else {
+                    const err = await res.json();
+                    notify(err.error || "Error al guardar", "error");
+                }
+            } catch (e) {
+                notify("Error de red", "error");
+            }
+        }
+
+        function editTemplate() {
+            const select = document.getElementById('template-select');
+            if (select.value) {
+                openTemplateModal(select.value);
+            }
+        }
+
+        async function archiveTemplate() {
+            const select = document.getElementById('template-select');
+            if (!select.value) return;
+
+            if (!confirm("¿Archivar esta plantilla?\n\nQuedará disponible en el historial pero no aparecerá en la lista activa.")) return;
+
+            try {
+                const res = await fetch(`/templates/${select.value}`, { method: 'DELETE' });
+                if (res.ok) {
+                    notify("Plantilla archivada");
+                    select.value = '';
+                    document.getElementById('template-info').classList.add('hidden');
+                    window.currentTemplateId = null;
+                    loadTemplates();
+                    updateVkBody();
+                } else {
+                    notify("Error al archivar", "error");
+                }
+            } catch (e) {
+                notify("Error de red", "error");
+            }
+        }
+
+        async function viewTemplateHistory() {
+            const select = document.getElementById('template-select');
+            if (!select.value) return;
+
+            try {
+                const res = await fetch(`/templates/${select.value}/history`);
+                const history = await res.json();
+
+                const content = document.getElementById('history-content');
+                content.innerHTML = history.map(h => `
+                    <div class="p-2 rounded ${h.is_active ? 'bg-emerald-50 border border-emerald-200' : 'bg-slate-50 border border-slate-200'}">
+                        <div class="flex justify-between items-center">
+                            <span class="font-medium">Versión ${h.version}</span>
+                            ${h.is_active ? '<span class="text-xs bg-emerald-500 text-white px-2 py-0.5 rounded">Activa</span>' : '<span class="text-xs bg-slate-400 text-white px-2 py-0.5 rounded">Archivada</span>'}
+                        </div>
+                        <div class="text-xs text-slate-500 mt-1">
+                            <div>Creada: ${new Date(h.created_at).toLocaleString('es-ES')}</div>
+                            <div>Por: ${h.created_by || 'N/A'}</div>
+                        </div>
+                    </div>
+                `).join('');
+
+                document.getElementById('history-modal').classList.remove('hidden');
+            } catch (e) {
+                notify("Error cargando historial", "error");
+            }
+        }
+
+        function closeHistoryModal() {
+            document.getElementById('history-modal').classList.add('hidden');
+        }
+    </script>
+</body>
+</html>

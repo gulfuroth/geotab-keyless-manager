@@ -1,0 +1,39 @@
+# OS files
+.DS_Store
+Thumbs.db
+
+# Database
+*.db
+
+# Logs
+*.log
+*.txt
+!readme.txt
+
+# Build artifacts
+build/
+dist/
+*.spec
+__pycache__/
+*.pyc
+
+# IDE
+.idea/
+.vscode/
+*.swp
+
+# Sensitive/temporary files
+*.zip
+*.xlsx
+
+# Old versions
+Old/
+
+# Test data
+fleet_bcn
+TestBCN
+vehicles.csv
+fleet.csv
+
+# Design files (optional - keeping .pen for now)
+# *.pen

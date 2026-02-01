@@ -1,0 +1,600 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Manual de Usuario - Geotab Keyless Manager</title>
+    <style>
+        @page {
+            size: A4;
+            margin: 2cm;
+        }
+        body {
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+            line-height: 1.6;
+            color: #333;
+            max-width: 800px;
+            margin: 0 auto;
+            padding: 20px;
+        }
+        h1 {
+            color: #00A3E0;
+            border-bottom: 3px solid #00A3E0;
+            padding-bottom: 10px;
+        }
+        h2 {
+            color: #2c3e50;
+            border-bottom: 1px solid #ddd;
+            padding-bottom: 5px;
+            margin-top: 30px;
+        }
+        h3 {
+            color: #34495e;
+            margin-top: 20px;
+        }
+        .header {
+            text-align: center;
+            margin-bottom: 40px;
+            padding: 20px;
+            background: linear-gradient(135deg, #00A3E0, #0077A3);
+            color: white;
+            border-radius: 10px;
+        }
+        .header h1 {
+            color: white;
+            border: none;
+            margin: 0;
+        }
+        .header p {
+            margin: 10px 0 0 0;
+            opacity: 0.9;
+        }
+        .toc {
+            background: #f8f9fa;
+            padding: 20px;
+            border-radius: 8px;
+            margin-bottom: 30px;
+        }
+        .toc h2 {
+            margin-top: 0;
+            border: none;
+        }
+        .toc ul {
+            list-style: none;
+            padding-left: 0;
+        }
+        .toc li {
+            padding: 5px 0;
+        }
+        .toc a {
+            color: #00A3E0;
+            text-decoration: none;
+        }
+        .toc a:hover {
+            text-decoration: underline;
+        }
+        .section {
+            margin-bottom: 30px;
+            page-break-inside: avoid;
+        }
+        .step {
+            background: #f0f7ff;
+            border-left: 4px solid #00A3E0;
+            padding: 15px;
+            margin: 15px 0;
+            border-radius: 0 8px 8px 0;
+        }
+        .step-number {
+            display: inline-block;
+            width: 30px;
+            height: 30px;
+            background: #00A3E0;
+            color: white;
+            text-align: center;
+            line-height: 30px;
+            border-radius: 50%;
+            margin-right: 10px;
+            font-weight: bold;
+        }
+        .warning {
+            background: #fff3cd;
+            border-left: 4px solid #ffc107;
+            padding: 15px;
+            margin: 15px 0;
+            border-radius: 0 8px 8px 0;
+        }
+        .warning::before {
+            content: "⚠️ ";
+        }
+        .info {
+            background: #d1ecf1;
+            border-left: 4px solid #17a2b8;
+            padding: 15px;
+            margin: 15px 0;
+            border-radius: 0 8px 8px 0;
+        }
+        .info::before {
+            content: "ℹ️ ";
+        }
+        .success {
+            background: #d4edda;
+            border-left: 4px solid #28a745;
+            padding: 15px;
+            margin: 15px 0;
+            border-radius: 0 8px 8px 0;
+        }
+        code {
+            background: #e9ecef;
+            padding: 2px 6px;
+            border-radius: 4px;
+            font-family: 'Courier New', monospace;
+        }
+        pre {
+            background: #2d3748;
+            color: #e2e8f0;
+            padding: 15px;
+            border-radius: 8px;
+            overflow-x: auto;
+        }
+        table {
+            width: 100%;
+            border-collapse: collapse;
+            margin: 15px 0;
+        }
+        th, td {
+            border: 1px solid #ddd;
+            padding: 12px;
+            text-align: left;
+        }
+        th {
+            background: #00A3E0;
+            color: white;
+        }
+        tr:nth-child(even) {
+            background: #f8f9fa;
+        }
+        .button-example {
+            display: inline-block;
+            padding: 8px 16px;
+            border-radius: 5px;
+            color: white;
+            font-weight: bold;
+            margin: 5px;
+        }
+        .btn-green { background: #28a745; }
+        .btn-blue { background: #007bff; }
+        .btn-red { background: #dc3545; }
+        .btn-orange { background: #fd7e14; }
+        .btn-cyan { background: #17a2b8; }
+        .footer {
+            text-align: center;
+            margin-top: 50px;
+            padding-top: 20px;
+            border-top: 1px solid #ddd;
+            color: #666;
+        }
+        .ui-section {
+            border: 2px solid #e0e0e0;
+            border-radius: 10px;
+            padding: 20px;
+            margin: 20px 0;
+            background: #fafafa;
+        }
+        .ui-section h4 {
+            margin-top: 0;
+            color: #00A3E0;
+        }
+    </style>
+</head>
+<body>
+
+<div class="header">
+    <h1>Geotab Keyless Manager</h1>
+    <p>Manual de Usuario v1.0</p>
+    <p>Sistema de Gestión de Llaves Virtuales</p>
+</div>
+
+<div class="toc">
+    <h2>Contenido</h2>
+    <ul>
+        <li><a href="#introduccion">1. Introducción</a></li>
+        <li><a href="#requisitos">2. Requisitos Previos</a></li>
+        <li><a href="#inicio-sesion">3. Inicio de Sesión</a></li>
+        <li><a href="#gestion-dispositivos">4. Gestión de Dispositivos</a></li>
+        <li><a href="#plantillas">5. Plantillas de Llaves Virtuales</a></li>
+        <li><a href="#crear-llaves">6. Crear Llaves Virtuales</a></li>
+        <li><a href="#eliminar-llaves">7. Eliminar Llaves Virtuales</a></li>
+        <li><a href="#logs">8. Registro de Actividad (Logs)</a></li>
+        <li><a href="#importar-csv">9. Importación CSV</a></li>
+        <li><a href="#soluciones">10. Solución de Problemas</a></li>
+    </ul>
+</div>
+
+<div class="section" id="introduccion">
+    <h2>1. Introducción</h2>
+    <p>
+        <strong>Geotab Keyless Manager</strong> es una aplicación web diseñada para gestionar llaves virtuales
+        en dispositivos Geotab equipados con tecnología Keyless. Permite crear, administrar y eliminar
+        llaves virtuales de forma masiva, facilitando la gestión de flotas de vehículos.
+    </p>
+
+    <h3>Características Principales</h3>
+    <ul>
+        <li>Gestión multi-dispositivo con operaciones en lote</li>
+        <li>Sistema de plantillas reutilizables para llaves virtuales</li>
+        <li>Soporte para múltiples bases de datos (multi-tenant)</li>
+        <li>Registro completo de actividad (logs)</li>
+        <li>Importación de dispositivos desde CSV</li>
+        <li>Interfaz intuitiva con indicadores de progreso</li>
+    </ul>
+</div>
+
+<div class="section" id="requisitos">
+    <h2>2. Requisitos Previos</h2>
+
+    <h3>Credenciales Necesarias</h3>
+    <ul>
+        <li><strong>Base de datos:</strong> Nombre de la base de datos Geotab asignada</li>
+        <li><strong>Email:</strong> Cuenta de usuario con permisos de administración</li>
+        <li><strong>Contraseña:</strong> Contraseña de la cuenta Geotab</li>
+    </ul>
+
+    <h3>Información de Dispositivos</h3>
+    <ul>
+        <li>Números de serie de los dispositivos Keyless (formato: <code>G9XXXXXXXX</code>)</li>
+        <li>Tags NFC autorizados (números de serie de tarjetas NFC)</li>
+    </ul>
+
+    <div class="warning">
+        Cada dispositivo permite un <strong>máximo de 4 llaves virtuales</strong> simultáneas.
+    </div>
+</div>
+
+<div class="section" id="inicio-sesion">
+    <h2>3. Inicio de Sesión</h2>
+
+    <div class="ui-section">
+        <h4>1. Authorization</h4>
+        <p>La sección de autorización se encuentra en la parte superior izquierda de la aplicación.</p>
+    </div>
+
+    <div class="step">
+        <span class="step-number">1</span>
+        <strong>Seleccionar Base de Datos:</strong> Introduzca el nombre de la base de datos Geotab en el campo "Database".
+    </div>
+
+    <div class="step">
+        <span class="step-number">2</span>
+        <strong>Introducir Credenciales:</strong> Complete los campos "Email" y "Password" con sus credenciales de Geotab.
+    </div>
+
+    <div class="step">
+        <span class="step-number">3</span>
+        <strong>Conectar:</strong> Pulse el botón <span class="button-example btn-cyan">Connect & Save</span>
+    </div>
+
+    <div class="success">
+        Al conectar correctamente, la barra superior mostrará "Sesión Activa" en verde y se cargarán los dispositivos disponibles.
+    </div>
+
+    <div class="info">
+        Las credenciales se guardan de forma segura y la sesión permanece activa hasta que se cierre manualmente con el botón "Cerrar Sesión".
+    </div>
+</div>
+
+<div class="section" id="gestion-dispositivos">
+    <h2>4. Gestión de Dispositivos</h2>
+
+    <h3>Panel de Dispositivos</h3>
+    <p>El panel central muestra la lista de dispositivos registrados con la siguiente información:</p>
+
+    <table>
+        <tr>
+            <th>Columna</th>
+            <th>Descripción</th>
+        </tr>
+        <tr>
+            <td><strong>Serial</strong></td>
+            <td>Número de serie del dispositivo Geotab</td>
+        </tr>
+        <tr>
+            <td><strong>Descripción</strong></td>
+            <td>Nombre o descripción del vehículo</td>
+        </tr>
+        <tr>
+            <td><strong>Llaves</strong></td>
+            <td>Número de llaves virtuales activas (máx. 4)</td>
+        </tr>
+        <tr>
+            <td><strong>Acciones</strong></td>
+            <td>Botones para ver detalles y sincronizar</td>
+        </tr>
+    </table>
+
+    <h3>Botones de Acción Global</h3>
+    <ul>
+        <li><span class="button-example btn-green">Deploy Selected</span> - Crear llaves en dispositivos seleccionados</li>
+        <li><span class="button-example btn-blue">Sync All</span> - Sincronizar todos los dispositivos con Geotab</li>
+        <li><span class="button-example btn-red">Delete Keys</span> - Eliminar llaves de dispositivos seleccionados</li>
+        <li><span class="button-example btn-orange">Delete Devices</span> - Eliminar dispositivos de la lista local</li>
+    </ul>
+
+    <h3>Añadir Dispositivos Manualmente</h3>
+    <div class="step">
+        <span class="step-number">1</span>
+        Introduzca el número de serie y descripción en los campos correspondientes.
+    </div>
+    <div class="step">
+        <span class="step-number">2</span>
+        Pulse <span class="button-example btn-cyan">Add Device</span>
+    </div>
+</div>
+
+<div class="section" id="plantillas">
+    <h2>5. Plantillas de Llaves Virtuales</h2>
+
+    <p>
+        Las plantillas permiten guardar configuraciones predefinidas de llaves virtuales para reutilizarlas
+        fácilmente. Cada plantilla incluye permisos, tags NFC autorizados y duración por defecto.
+    </p>
+
+    <div class="ui-section">
+        <h4>2. Plantillas de Llaves</h4>
+        <p>Esta sección permite seleccionar y gestionar plantillas de configuración.</p>
+    </div>
+
+    <h3>Usar una Plantilla Existente</h3>
+    <div class="step">
+        <span class="step-number">1</span>
+        Seleccione una plantilla del desplegable "Seleccionar Plantilla".
+    </div>
+    <div class="step">
+        <span class="step-number">2</span>
+        La configuración se cargará automáticamente en el editor de llaves virtuales, incluyendo los tags NFC.
+    </div>
+
+    <h3>Crear Nueva Plantilla</h3>
+    <div class="step">
+        <span class="step-number">1</span>
+        Pulse el botón <span class="button-example btn-green">+ Nueva</span>
+    </div>
+    <div class="step">
+        <span class="step-number">2</span>
+        Complete el formulario:
+        <ul>
+            <li><strong>Nombre:</strong> Nombre identificativo (ej: "Conductor Habitual")</li>
+            <li><strong>Referencia Usuario:</strong> Identificador para logs (ej: "Master Key")</li>
+            <li><strong>Tags NFC:</strong> Números de serie de tarjetas NFC, separados por coma</li>
+            <li><strong>Duración (meses):</strong> Validez por defecto de las llaves</li>
+            <li><strong>Configuración JSON:</strong> Permisos y privilegios en formato JSON</li>
+        </ul>
+    </div>
+    <div class="step">
+        <span class="step-number">3</span>
+        Pulse <span class="button-example btn-green">Guardar</span>
+    </div>
+
+    <h3>Formato de Configuración JSON</h3>
+    <pre>{
+  "permissions": ["Lock", "Unlock", "IgnitionInhibit", "IgnitionEnable"],
+  "privileges": ["CheckinOverride"],
+  "endBookConditions": ["IgnitionOff"]
+}</pre>
+
+    <h3>Versionado de Plantillas</h3>
+    <div class="info">
+        Al editar una plantilla existente, se crea automáticamente una <strong>nueva versión</strong>.
+        Las versiones anteriores se archivan pero permanecen consultables para auditoría.
+    </div>
+
+    <p>Para ver el historial de versiones, pulse el botón <strong>"Historial"</strong> junto a la plantilla seleccionada.</p>
+</div>
+
+<div class="section" id="crear-llaves">
+    <h2>6. Crear Llaves Virtuales</h2>
+
+    <div class="ui-section">
+        <h4>3. Definición Llave Virtual</h4>
+        <p>El editor JSON muestra la configuración completa de la llave a crear.</p>
+    </div>
+
+    <h3>Proceso de Creación</h3>
+
+    <div class="step">
+        <span class="step-number">1</span>
+        <strong>Seleccionar dispositivos:</strong> Marque las casillas de los dispositivos donde desea crear llaves.
+    </div>
+
+    <div class="step">
+        <span class="step-number">2</span>
+        <strong>Configurar la llave:</strong>
+        <ul>
+            <li>Seleccione una plantilla o configure manualmente</li>
+            <li>Ajuste la duración con el slider (1-24 meses)</li>
+            <li>Modifique la referencia de usuario si es necesario</li>
+        </ul>
+    </div>
+
+    <div class="step">
+        <span class="step-number">3</span>
+        <strong>Desplegar:</strong> Pulse <span class="button-example btn-green">Deploy Selected</span>
+    </div>
+
+    <div class="step">
+        <span class="step-number">4</span>
+        <strong>Confirmar:</strong> Verifique los dispositivos seleccionados y confirme la operación.
+    </div>
+
+    <div class="warning">
+        El sistema verificará que ningún dispositivo supere el límite de 4 llaves virtuales antes de proceder.
+    </div>
+
+    <h3>Indicador de Progreso</h3>
+    <p>
+        Durante operaciones masivas, se muestra una barra de progreso indicando:
+    </p>
+    <ul>
+        <li>Número de dispositivos procesados / total</li>
+        <li>Estado de cada operación (éxito/error)</li>
+        <li>Resumen final de la operación</li>
+    </ul>
+</div>
+
+<div class="section" id="eliminar-llaves">
+    <h2>7. Eliminar Llaves Virtuales</h2>
+
+    <h3>Eliminar Llaves Individuales</h3>
+    <div class="step">
+        <span class="step-number">1</span>
+        Pulse en "Ver" junto al dispositivo para abrir el detalle.
+    </div>
+    <div class="step">
+        <span class="step-number">2</span>
+        En el popup de llaves activas, pulse el botón de eliminar junto a la llave deseada.
+    </div>
+
+    <h3>Eliminar Todas las Llaves (Masivo)</h3>
+    <div class="step">
+        <span class="step-number">1</span>
+        Seleccione los dispositivos de los que desea eliminar todas las llaves.
+    </div>
+    <div class="step">
+        <span class="step-number">2</span>
+        Pulse <span class="button-example btn-red">Delete Keys</span>
+    </div>
+    <div class="step">
+        <span class="step-number">3</span>
+        Confirme la operación en el diálogo de confirmación.
+    </div>
+
+    <div class="warning">
+        Esta acción eliminará <strong>TODAS</strong> las llaves virtuales de los dispositivos seleccionados. Esta operación no se puede deshacer.
+    </div>
+</div>
+
+<div class="section" id="logs">
+    <h2>8. Registro de Actividad (Logs)</h2>
+
+    <p>
+        El sistema mantiene un registro completo de todas las operaciones realizadas para auditoría y seguimiento.
+    </p>
+
+    <h3>Información Registrada</h3>
+    <table>
+        <tr>
+            <th>Campo</th>
+            <th>Descripción</th>
+        </tr>
+        <tr>
+            <td>Fecha/Hora</td>
+            <td>Momento exacto de la operación</td>
+        </tr>
+        <tr>
+            <td>Usuario</td>
+            <td>Email del usuario que realizó la acción</td>
+        </tr>
+        <tr>
+            <td>Acción</td>
+            <td>Tipo de operación (CREATE_VK, DELETE_VK, etc.)</td>
+        </tr>
+        <tr>
+            <td>Dispositivo</td>
+            <td>Serial del dispositivo afectado</td>
+        </tr>
+        <tr>
+            <td>Detalles</td>
+            <td>Información adicional (plantilla usada, configuración, etc.)</td>
+        </tr>
+    </table>
+
+    <h3>Tipos de Acciones</h3>
+    <ul>
+        <li><code>CREATE_VK</code> - Creación de llave virtual</li>
+        <li><code>DELETE_VK</code> - Eliminación de llave virtual</li>
+        <li><code>DELETE_ALL_VK</code> - Eliminación masiva de llaves</li>
+        <li><code>SYNC</code> - Sincronización de dispositivo</li>
+        <li><code>LOGIN</code> - Inicio de sesión</li>
+        <li><code>LOGOUT</code> - Cierre de sesión</li>
+        <li><code>RESET_LOGS</code> - Limpieza del registro</li>
+    </ul>
+
+    <h3>Exportar y Resetear Logs</h3>
+    <p>
+        Use el botón <span class="button-example btn-blue">Exportar CSV</span> para descargar el registro completo.
+    </p>
+    <p>
+        Para limpiar el registro, pulse <span class="button-example btn-red">Reset Log</span>.
+        Esta acción se registrará antes de limpiar el histórico.
+    </p>
+</div>
+
+<div class="section" id="importar-csv">
+    <h2>9. Importación CSV</h2>
+
+    <p>
+        Puede importar dispositivos masivamente desde un archivo CSV.
+    </p>
+
+    <h3>Formato del Archivo</h3>
+    <pre>serial,descripcion
+G9C3E41234,Vehículo Comercial 01
+G9C3E41235,Furgoneta Reparto
+G9C3E41236,Camión Logística</pre>
+
+    <div class="info">
+        <strong>Formato requerido:</strong>
+        <ul>
+            <li>Primera línea: cabecera (serial,descripcion)</li>
+            <li>Siguientes líneas: datos de dispositivos</li>
+            <li>Separador: coma (,)</li>
+            <li>Codificación: UTF-8</li>
+        </ul>
+    </div>
+
+    <h3>Proceso de Importación</h3>
+    <div class="step">
+        <span class="step-number">1</span>
+        Pulse <span class="button-example btn-blue">Import CSV</span>
+    </div>
+    <div class="step">
+        <span class="step-number">2</span>
+        Seleccione el archivo CSV con los dispositivos.
+    </div>
+    <div class="step">
+        <span class="step-number">3</span>
+        Los dispositivos se añadirán a la lista automáticamente.
+    </div>
+</div>
+
+<div class="section" id="soluciones">
+    <h2>10. Solución de Problemas</h2>
+
+    <h3>Error: "No Active Session"</h3>
+    <p><strong>Causa:</strong> La sesión ha expirado o no se ha iniciado correctamente.</p>
+    <p><strong>Solución:</strong> Vuelva a introducir las credenciales y pulse "Connect & Save".</p>
+
+    <h3>Error: "Máximo 4 llaves por dispositivo"</h3>
+    <p><strong>Causa:</strong> El dispositivo ya tiene 4 llaves virtuales activas.</p>
+    <p><strong>Solución:</strong> Elimine alguna llave existente antes de crear una nueva.</p>
+
+    <h3>Error: "Request failed"</h3>
+    <p><strong>Causa:</strong> Error de comunicación con el servidor Geotab Keyless.</p>
+    <p><strong>Solución:</strong> Verifique su conexión a internet y que las credenciales sean correctas.</p>
+
+    <h3>Dispositivo no aparece tras sincronizar</h3>
+    <p><strong>Causa:</strong> El número de serie puede ser incorrecto o el dispositivo no está registrado en Geotab.</p>
+    <p><strong>Solución:</strong> Verifique el número de serie en la plataforma Geotab.</p>
+
+    <h3>Tags NFC no se aplican</h3>
+    <p><strong>Causa:</strong> Los tags NFC deben estar en formato correcto.</p>
+    <p><strong>Solución:</strong> Use el formato completo del serial NFC (ej: 7CF22JDPA1). Separe múltiples tags con comas.</p>
+</div>
+
+<div class="footer">
+    <p><strong>Geotab Keyless Manager</strong></p>
+    <p>Desarrollado para Vecttor</p>
+    <p>Versión 1.0 - Febrero 2026</p>
+</div>
+
+</body>
+</html>
