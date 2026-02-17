@@ -52,7 +52,21 @@
                     <input id="db" type="text" placeholder="Database" onchange="loadVehicles()" class="w-full border mb-2 p-2 rounded text-sm outline-none focus:ring-2 focus:ring-blue-500">
                     <input id="user" type="email" placeholder="Email" class="w-full border mb-2 p-2 rounded text-sm outline-none">
                     <input id="pass" type="password" placeholder="Password" class="w-full border mb-4 p-2 rounded text-sm outline-none">
+                    <input id="mygeotab-server" type="text" placeholder="MyGeotab Server (my.geotab.com)" value="my.geotab.com" class="w-full border mb-2 p-2 rounded text-sm outline-none focus:ring-2 focus:ring-blue-500">
                     <button onclick="authenticate()" class="w-full bg-[#00a9e0] hover:bg-[#007fb0] text-white py-2.5 rounded font-bold transition">Connect & Save</button>
+                    <div class="mt-4 pt-3 border-t border-slate-200 space-y-2">
+                        <div class="flex gap-2">
+                            <button onclick="loadMyGeotabGroups()" class="flex-1 text-xs bg-slate-100 hover:bg-slate-200 px-2 py-2 rounded font-medium">Cargar grupos</button>
+                            <button onclick="importSelectedGroup(false)" class="flex-1 text-xs bg-emerald-600 hover:bg-emerald-700 text-white px-2 py-2 rounded font-bold">Importar grupo</button>
+                        </div>
+                        <select id="mygeotab-group" class="w-full border p-2 rounded text-sm outline-none focus:ring-2 focus:ring-blue-500">
+                            <option value="">-- Seleccionar grupo MyGeotab --</option>
+                        </select>
+                        <label class="flex items-center gap-2 text-xs text-slate-600">
+                            <input id="auto-import-group" type="checkbox">
+                            Importar automáticamente este grupo al conectar
+                        </label>
+                    </div>
                 </div>
 
                 <div class="bg-white p-5 rounded-lg shadow-sm border border-slate-200">
@@ -226,11 +240,12 @@
             const db = document.getElementById('db').value;
             const user = document.getElementById('user').value;
             const pass = document.getElementById('pass').value;
+            const server = document.getElementById('mygeotab-server').value || 'my.geotab.com';
             if(!db || !user || !pass) return notify("Faltan datos", "error");
             document.cookie = `user_email=${user}; path=/`;
             const res = await fetch('/auth', {
                 method: 'POST', headers: {'Content-Type': 'application/json'},
-                body: JSON.stringify({database: db, server: "my.geotab.com", username: user, password: pass})
+                body: JSON.stringify({database: db, server, username: user, password: pass})
             });
             if(res.ok) {
                 sessionActive = true;
@@ -238,11 +253,15 @@
                 document.getElementById('auth-indicator').innerText = "Session Active (" + db + ")";
                 document.getElementById('auth-indicator').className = "text-xs font-bold px-4 py-1.5 rounded-full bg-emerald-100 text-emerald-600 border border-emerald-200";
                 document.getElementById('btn-logout').classList.remove('hidden');
-                await fetch('/settings', {method:'POST', headers:{'Content-Type':'application/json'}, body:JSON.stringify({database:db, username:user})});
+                await fetch('/settings', {method:'POST', headers:{'Content-Type':'application/json'}, body:JSON.stringify({database:db, username:user, mygeotab_server: server})});
                 showLoading("Cargando dispositivos y plantillas...");
                 await loadVehicles();
                 await loadTemplates();
                 hideLoading();
+                await loadMyGeotabGroups();
+                if (document.getElementById('auto-import-group').checked && document.getElementById('mygeotab-group').value) {
+                    await importSelectedGroup(true);
+                }
                 const deviceCount = document.querySelectorAll('.v-checkbox').length;
                 if(deviceCount > 0 && confirm(`¿Sincronizar los ${deviceCount} dispositivos con el servidor?`)) {
                     await syncAllDevices();
@@ -379,6 +398,73 @@
         async function removeLocal(s) { if(confirm("¿Quitar de la lista?")) { await fetch(`/vehicles/${s}`, {method:'DELETE'}); loadVehicles(); } }
         function toggleAll(src) { document.querySelectorAll('.v-checkbox').forEach(c => c.checked = src.checked); }
 
+        function getMyGeotabPayload() {
+            const database = document.getElementById('db').value.trim();
+            const username = document.getElementById('user').value.trim();
+            const password = document.getElementById('pass').value;
+            const server = (document.getElementById('mygeotab-server').value || 'my.geotab.com').trim();
+            return { database, username, password, server };
+        }
+
+        async function loadMyGeotabGroups() {
+            const payload = getMyGeotabPayload();
+            if(!payload.database || !payload.username || !payload.password) {
+                notify("Complete Database, Email y Password para cargar grupos", "error");
+                return;
+            }
+            try {
+                const res = await fetch('/mygeotab/groups', {
+                    method: 'POST',
+                    headers: {'Content-Type': 'application/json'},
+                    body: JSON.stringify(payload)
+                });
+                const data = await res.json();
+                if(!res.ok) return notify(data.error || "Error cargando grupos", "error");
+
+                const selectedId = document.getElementById('mygeotab-group').value || window.savedMyGeotabGroupId || '';
+                const options = ['<option value="">-- Seleccionar grupo MyGeotab --</option>']
+                    .concat((data.groups || []).map(g => `<option value="${g.id}">${g.name}</option>`));
+                document.getElementById('mygeotab-group').innerHTML = options.join('');
+                if (selectedId) document.getElementById('mygeotab-group').value = selectedId;
+                notify(`Grupos cargados: ${(data.groups || []).length}`);
+            } catch (e) {
+                notify(`Error de red: ${e.message}`, "error");
+            }
+        }
+
+        async function importSelectedGroup(silentMode = false) {
+            const payload = getMyGeotabPayload();
+            const groupSelect = document.getElementById('mygeotab-group');
+            const groupId = groupSelect.value;
+            if(!groupId) {
+                if(!silentMode) notify("Seleccione un grupo MyGeotab", "error");
+                return;
+            }
+            if(!payload.database || !payload.username || !payload.password) {
+                if(!silentMode) notify("Complete credenciales para importar", "error");
+                return;
+            }
+            try {
+                if(!silentMode) showLoading("Importando vehículos desde MyGeotab...");
+                const res = await fetch('/mygeotab/import-group', {
+                    method: 'POST',
+                    headers: {'Content-Type': 'application/json'},
+                    body: JSON.stringify({...payload, groupId})
+                });
+                const data = await res.json();
+                if(!silentMode) hideLoading();
+                if(!res.ok) {
+                    if(!silentMode) notify(data.error || "Error importando grupo", "error");
+                    return;
+                }
+                await loadVehicles();
+                if(!silentMode) notify(`Importados ${data.imported} vehículos desde MyGeotab`);
+            } catch (e) {
+                if(!silentMode) hideLoading();
+                if(!silentMode) notify(`Error de red: ${e.message}`, "error");
+            }
+        }
+
         let sessionActive = false;
         let sessionTimer = null;
         const SESSION_TIMEOUT = 55 * 60 * 1000; // 55 minutes warning
@@ -456,6 +542,7 @@
                 document.getElementById('btn-logout').classList.add('hidden');
                 document.getElementById('db').value = '';
                 document.getElementById('pass').value = '';
+                document.getElementById('mygeotab-group').innerHTML = '<option value="">-- Seleccionar grupo MyGeotab --</option>';
                 allVehicles = [];
                 renderVehicles([]);
                 // Clear template state
@@ -647,9 +734,46 @@
                 loadTemplates();
             }
             if(settings.username) document.getElementById('user').value = settings.username;
+            if(settings.mygeotab_server) document.getElementById('mygeotab-server').value = settings.mygeotab_server;
+            if(settings.mygeotab_auto_import) document.getElementById('auto-import-group').checked = settings.mygeotab_auto_import === '1';
+            if (settings.mygeotab_group_id) {
+                window.savedMyGeotabGroupId = settings.mygeotab_group_id;
+                const savedName = settings.mygeotab_group_name || settings.mygeotab_group_id;
+                document.getElementById('mygeotab-group').innerHTML =
+                    `<option value="">-- Seleccionar grupo MyGeotab --</option><option value="${settings.mygeotab_group_id}" selected>${savedName}</option>`;
+            }
             initResizableColumns();
             updateVkBody();
         };
+
+        document.addEventListener('change', async (e) => {
+            if (e.target.id === 'mygeotab-group') {
+                const selectedOption = e.target.selectedOptions[0];
+                window.savedMyGeotabGroupId = e.target.value || '';
+                await fetch('/settings', {
+                    method: 'POST',
+                    headers: {'Content-Type': 'application/json'},
+                    body: JSON.stringify({
+                        mygeotab_group_id: e.target.value || '',
+                        mygeotab_group_name: selectedOption ? selectedOption.text : ''
+                    })
+                });
+            }
+            if (e.target.id === 'auto-import-group') {
+                await fetch('/settings', {
+                    method: 'POST',
+                    headers: {'Content-Type': 'application/json'},
+                    body: JSON.stringify({ mygeotab_auto_import: e.target.checked ? '1' : '0' })
+                });
+            }
+            if (e.target.id === 'mygeotab-server') {
+                await fetch('/settings', {
+                    method: 'POST',
+                    headers: {'Content-Type': 'application/json'},
+                    body: JSON.stringify({ mygeotab_server: e.target.value || 'my.geotab.com' })
+                });
+            }
+        });
 
         function updateDuration(months, skipVkBodyUpdate = false) {
             document.getElementById('duration-value').innerText = months + (months === '1' ? ' mes' : ' meses');

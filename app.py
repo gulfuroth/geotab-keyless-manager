@@ -10,6 +10,7 @@ def get_resource_path(relative_path):
 
 app = Flask(__name__, template_folder=get_resource_path("templates"))
 GEOTAB_BASE_URL = "https://keyless.geotab.com/api"
+MYGEOTAB_DEFAULT_SERVER = "my.geotab.com"
 
 exe_dir = os.path.dirname(sys.executable if hasattr(sys, 'frozen') else os.path.abspath(__file__))
 log_file_path = os.path.join(exe_dir, "fleet_manager.log")
@@ -90,6 +91,55 @@ def add_log(user, action, serial, params):
     conn.commit()
     conn.close()
 
+def mygeotab_rpc(server, method, params):
+    base_server = (server or MYGEOTAB_DEFAULT_SERVER).strip()
+    if not base_server:
+        base_server = MYGEOTAB_DEFAULT_SERVER
+    url = f"https://{base_server}/apiv1"
+    payload = {"method": method, "params": params}
+    res = requests.post(url, json=payload, timeout=30)
+    if res.status_code != 200:
+        return None, f"HTTP {res.status_code}: {res.text[:250]}"
+    data = res.json()
+    if "error" in data:
+        return None, data["error"].get("message", "MyGeotab API error")
+    return data.get("result"), None
+
+def mygeotab_authenticate(database, username, password, server):
+    if not database or not username or not password:
+        return None, "Database, username y password son obligatorios"
+    result, err = mygeotab_rpc(server, "Authenticate", {
+        "database": database,
+        "userName": username,
+        "password": password
+    })
+    if err:
+        return None, err
+    credentials = result.get("credentials") if isinstance(result, dict) else result
+    if not credentials:
+        return None, "No se recibieron credenciales de MyGeotab"
+    return credentials, None
+
+def get_mygeotab_devices_by_group(server, credentials, group_id):
+    # Try known DeviceSearch shapes because some tenants differ in accepted filter serialization.
+    search_candidates = [
+        {"groups": [{"id": group_id}]},
+        {"groups": [group_id]},
+        {"groups": [{"Id": group_id}]}
+    ]
+    last_error = "No se pudo filtrar por grupo"
+    for search in search_candidates:
+        result, err = mygeotab_rpc(server, "Get", {
+            "typeName": "Device",
+            "credentials": credentials,
+            "search": search
+        })
+        if not err and isinstance(result, list):
+            return result, None
+        if err:
+            last_error = err
+    return None, last_error
+
 @app.route('/')
 def index(): return render_template('index.html')
 
@@ -119,6 +169,77 @@ def authenticate():
         return resp
     add_log(request.json.get('username', 'unknown'), "LOGIN_FAILED", request.json.get('database', 'unknown'), {"status": res.status_code})
     return jsonify({"error": "Auth failed"}), 401
+
+@app.route('/mygeotab/groups', methods=['POST'])
+def mygeotab_groups():
+    data = request.json or {}
+    database = data.get('database')
+    username = data.get('username')
+    password = data.get('password')
+    server = data.get('server', MYGEOTAB_DEFAULT_SERVER)
+
+    try:
+        credentials, err = mygeotab_authenticate(database, username, password, server)
+        if err:
+            return jsonify({"error": err}), 401
+
+        result, err = mygeotab_rpc(server, "Get", {
+            "typeName": "Group",
+            "credentials": credentials
+        })
+        if err:
+            return jsonify({"error": err}), 502
+
+        groups = []
+        for g in (result or []):
+            gid = g.get("id")
+            gname = g.get("name")
+            if gid and gname:
+                groups.append({"id": gid, "name": gname})
+        groups.sort(key=lambda x: x["name"].lower())
+        return jsonify({"groups": groups})
+    except requests.RequestException as e:
+        return jsonify({"error": f"Error de conexión con MyGeotab: {str(e)}"}), 502
+
+@app.route('/mygeotab/import-group', methods=['POST'])
+def mygeotab_import_group():
+    data = request.json or {}
+    database = data.get('database')
+    username = data.get('username')
+    password = data.get('password')
+    server = data.get('server', MYGEOTAB_DEFAULT_SERVER)
+    group_id = data.get('groupId')
+
+    if not group_id:
+        return jsonify({"error": "groupId es obligatorio"}), 400
+
+    try:
+        credentials, err = mygeotab_authenticate(database, username, password, server)
+        if err:
+            return jsonify({"error": err}), 401
+
+        devices, err = get_mygeotab_devices_by_group(server, credentials, group_id)
+        if err:
+            return jsonify({"error": err}), 502
+
+        conn = sqlite3.connect(db_path)
+        imported = 0
+        for d in (devices or []):
+            serial = (d.get("serialNumber") or "").strip()
+            if not serial:
+                continue
+            desc = (d.get("name") or d.get("description") or serial).strip()
+            conn.execute(
+                "INSERT OR REPLACE INTO vehicles (serial_number, description, tenant_db) VALUES (?, ?, ?)",
+                (serial, desc, database)
+            )
+            imported += 1
+        conn.commit()
+        conn.close()
+        add_log(request.cookies.get('user_email') or username, "IMPORT_MYG_GROUP", group_id, {"count": imported})
+        return jsonify({"status": "done", "imported": imported, "groupId": group_id})
+    except requests.RequestException as e:
+        return jsonify({"error": f"Error de conexión con MyGeotab: {str(e)}"}), 502
 
 @app.route('/vehicles', methods=['GET', 'POST'])
 def manage_vehicles():
